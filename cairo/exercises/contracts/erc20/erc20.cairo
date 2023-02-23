@@ -114,11 +114,9 @@ func transfer{syscall_ptr: felt*,bitwise_ptr: BitwiseBuiltin*, pedersen_ptr: Has
     recipient: felt, amount: Uint256
 ) -> (success: felt) {
     alloc_locals;
+    
     let (local bit) = bitwise_and(amount.low, 1);
-
-    with_attr error_message("Revert") {
-      assert_not_equal(bit, 0);
-    }
+    assert bit = 0;
 
     ERC20_transfer(recipient, amount);
     return (1,);
@@ -128,6 +126,7 @@ func transfer{syscall_ptr: felt*,bitwise_ptr: BitwiseBuiltin*, pedersen_ptr: Has
 func faucet{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(amount: Uint256) -> (
     success: felt
 ) {
+    assert_le(amount.low, 1000);
     let (caller) = get_caller_address();
     ERC20_mint(caller, amount);
     return (1,);
