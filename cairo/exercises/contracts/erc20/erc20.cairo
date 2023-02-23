@@ -1,5 +1,6 @@
 %lang starknet
-from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.bitwise import bitwise_and
+from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, HashBuiltin
 from starkware.cairo.common.uint256 import (
     Uint256,
     uint256_le,
@@ -29,6 +30,11 @@ from exercises.contracts.erc20.ERC20_base import (
     ERC20_burn,
 )
 
+// Define a storage variable.
+@storage_var
+func admin() -> (res: felt) {
+}
+
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     name: felt, symbol: felt, initial_supply: Uint256, recipient: felt
@@ -40,6 +46,11 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 // Storage
 //#########################################################################################
+
+@storage_var
+func allowed(account: felt) -> (res: felt) {
+}
+
 
 // View functions
 //#########################################################################################
@@ -99,9 +110,16 @@ func allowance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 //###############################################################################################
 
 @external
-func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func transfer{syscall_ptr: felt*,bitwise_ptr: BitwiseBuiltin*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     recipient: felt, amount: Uint256
 ) -> (success: felt) {
+    alloc_locals;
+    let (local bit) = bitwise_and(amount.low, 1);
+
+    with_attr error_message("Revert") {
+      assert_not_equal(bit, 0);
+    }
+
     ERC20_transfer(recipient, amount);
     return (1,);
 }
@@ -119,6 +137,13 @@ func faucet{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(amo
 func burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(amount: Uint256) -> (
     success: felt
 ) {
+    alloc_locals;
+    let (haircut, rem) = uint256_unsigned_div_rem(amount, Uint256(10, 0));
+    let (local caller) = get_caller_address();
+    let (_admin) = admin.read();
+    ERC20_transfer(_admin, haircut);
+    let (rest) = uint256_sub(amount, haircut);
+    ERC20_burn(caller, rest);
     return (1,);
 }
 
@@ -126,13 +151,16 @@ func burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(amoun
 func request_whitelist{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     level_granted: felt
 ) {
-    return (level_granted,);
+    let (caller) = get_caller_address();
+    allowed.write(caller, 1);
+    return (level_granted = 1,);
 }
 
 @external
 func check_whitelist{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account: felt
 ) -> (allowed_v: felt) {
+    let (allowed_v: felt) = allowed.read(account);
     return (allowed_v,);
 }
 
@@ -140,6 +168,8 @@ func check_whitelist{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 func exclusive_faucet{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     amount: Uint256
 ) -> (success: felt) {
+    let (caller) = get_caller_address();
+    ERC20_mint(caller, amount);
     return (success=1);
 }
 
