@@ -14,5 +14,16 @@ from starkware.cairo.common.math import unsigned_div_rem
 func pattern{bitwise_ptr: BitwiseBuiltin*, range_check_ptr}(
     n: felt, idx: felt, exp: felt, broken_chain: felt
 ) -> (true: felt) {
+    // 1. find floor n div 2
+    let (half, q) = unsigned_div_rem(value=n, div=2);
+    // 2. res + n
+    let sum = half + n;
+    // 3. res + n + 1
+    let next = sum + 1;
+    // 4. xor (res + n + 1, res + n)
+    let (xor) = bitwise_and(sum, next);
+    if (xor == 0) {
+      return (1,);
+    }
     return (0,);
 }
